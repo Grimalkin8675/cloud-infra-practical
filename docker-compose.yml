@@ -1,0 +1,70 @@
+version: '2'
+
+networks:
+  tpdocker:
+    ipam:
+      config:
+        - subnet: 10.16.0.0/24
+
+services:
+  # MongoDB
+  mongodb1:
+    image: mongo:4.0.3-xenial
+    hostname: mongodb1
+    networks:
+      - tpdocker
+    environment:
+      MONGO_INITDB_DATABASE: ${DB_NAME}
+    command: ["mongod", "--replSet", "replicaTp"]
+
+  mongodb2:
+    image: mongo:4.0.3-xenial
+    hostname: mongodb2
+    networks:
+      - tpdocker
+    environment:
+      MONGO_INITDB_DATABASE: ${DB_NAME}
+    command: ["mongod", "--replSet", "replicaTp"]
+
+  mongoArbiter:
+    image: mongo:4.0.3-xenial
+    hostname: mongoArbiter
+    networks:
+      - tpdocker
+    environment:
+      MONGO_INITDB_DATABASE: ${DB_NAME}
+    command: ["mongod", "--replSet", "replicaTp"]
+
+  # careful: the container below always drops `MONGO_INITDB_DATABASE` and
+  # reinserts datas from `./datas`
+  insert_datas:
+    image: mongo:4.0.3-xenial
+    networks:
+      - tpdocker
+    volumes:
+      - ./mongodb:/mongodb:ro
+    environment:
+      MONGO_INITDB_DATABASE: ${DB_NAME}
+    command: ["bash", "/mongodb/insert-datas.sh"]
+
+  # RESTHeart backend
+  restheart:
+    image: softinstigate/restheart:3.4.2
+    networks:
+      - tpdocker
+    ports:
+      - 63422:8080
+    volumes:
+      - ./restheart:/opt/restheart/etc:ro
+
+  # React frontend
+  frontreact:
+    build: ./frontreact
+    image: mynpm:custom
+    networks:
+      - tpdocker
+    volumes:
+      - ./frontreact/app:/frontreact
+    ports:
+      - 63423:3000
+    command: ["npm", "run", "start"]
